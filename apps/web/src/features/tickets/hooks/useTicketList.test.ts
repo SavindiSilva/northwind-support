@@ -51,4 +51,29 @@ describe('useTicketList', () => {
     expect(result.current.isLoading).toBe(false);
     expect(result.current.data?.items).toHaveLength(1);
   });
+
+  it('fetches immediately when status changes without changing search', async () => {
+    const { result } = renderHook(() => useTicketList());
+
+    // Allow the initial request to run.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(300);
+    });
+
+    expect(getTickets).toHaveBeenCalledTimes(1);
+
+    // Changing Status alone must trigger another request immediately.
+    await act(async () => {
+      result.current.updateFilters({ status: 'InProgress' });
+      await Promise.resolve();
+    });
+
+    expect(getTickets).toHaveBeenCalledTimes(2);
+    expect(getTickets).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        status: 'InProgress',
+        search: '',
+      }),
+    );
+  });
 });
