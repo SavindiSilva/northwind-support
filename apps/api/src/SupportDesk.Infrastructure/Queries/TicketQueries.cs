@@ -17,14 +17,60 @@ namespace SupportDesk.Infrastructure.Queries;
 public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQueries
 {
     /// <remarks>
-    /// Sorts and pages every ticket. The filter values bound into <paramref name="query"/>
-    /// (search, status, priority, category, customer, agent, unassigned-only) are not applied
-    /// yet: server-side filtering is still to be built.
+    /// Applies the requested filters in the database before counting, sorting and paging
+    /// the matching tickets.
     /// </remarks>
-    public async Task<PagedResult<TicketListItemDto>> GetPagedAsync(TicketQuery query, CancellationToken ct)
+    
+    public async Task<PagedResult<TicketListItemDto>> GetPagedAsync(
+        TicketQuery query,
+        CancellationToken ct)
     {
         var tickets = TicketsWithLabels();
 
+        // Apply exact-match filters in the database.
+        if (query.Status is not null)
+        {
+            tickets = tickets.Where(x => x.Ticket.Status == query.Status.Value);
+        }
+
+        if (query.Priority is not null)
+        {
+            tickets = tickets.Where(x => x.Ticket.Priority == query.Priority.Value);
+        }
+
+        if (query.CategoryId is not null)
+        {
+            tickets = tickets.Where(x => x.Ticket.CategoryId == query.CategoryId.Value);
+        }
+
+        if (query.CustomerId is not null)
+        {
+            tickets = tickets.Where(x => x.Ticket.CustomerId == query.CustomerId.Value);
+        }
+
+        if (query.AssignedAgentId is not null)
+        {
+            tickets = tickets.Where(
+                x => x.Ticket.AssignedAgentId == query.AssignedAgentId.Value);
+        }
+
+        if (query.UnassignedOnly)
+        {
+            tickets = tickets.Where(x => x.Ticket.AssignedAgentId == null);
+        }
+
+        // Ignore blank searches and trim spaces around the search text.
+        var search = query.Search?.Trim();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            tickets = tickets.Where(x =>
+                x.Ticket.Title.Contains(search) ||
+                x.Ticket.Reference.Contains(search) ||
+                x.Customer.Name.Contains(search));
+        }
+
+        // Count only matching tickets, before sorting and pagination.
         var totalCount = await tickets.CountAsync(ct);
 
         var now = clock.UtcNow;
@@ -39,19 +85,26 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
                 Title = x.Ticket.Title,
                 Status = x.Ticket.Status,
                 Priority = x.Ticket.Priority,
-                Customer = new CustomerSummaryDto(x.Customer.Id, x.Customer.Name, x.Customer.Tier),
-                Category = new CategorySummaryDto(x.Category.Id, x.Category.Name),
-                AssignedAgent = x.Agent == null ? null : new AgentSummaryDto(x.Agent.Id, x.Agent.FullName),
+                Customer = new CustomerSummaryDto(
+                    x.Customer.Id, x.Customer.Name, x.Customer.Tier),
+                Category = new CategorySummaryDto(
+                    x.Category.Id, x.Category.Name),
+                AssignedAgent = x.Agent == null
+                    ? null
+                    : new AgentSummaryDto(x.Agent.Id, x.Agent.FullName),
                 CreatedAtUtc = x.Ticket.CreatedAtUtc,
                 UpdatedAtUtc = x.Ticket.UpdatedAtUtc,
                 DueAtUtc = x.Ticket.DueAtUtc,
                 ResolvedAtUtc = x.Ticket.ResolvedAtUtc,
-                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.ResolvedAtUtc, now)
+                SlaStatus = SlaEvaluator.Evaluate(
+                    x.Ticket.DueAtUtc, x.Ticket.ResolvedAtUtc, now)
             })
             .ToListAsync(ct);
 
-        return new PagedResult<TicketListItemDto>(items, query.Page, query.PageSize, totalCount);
+        return new PagedResult<TicketListItemDto>(
+            items, query.Page, query.PageSize, totalCount);
     }
+
 
     public Task<TicketDetailDto?> GetDetailAsync(int id, CancellationToken ct)
     {
