@@ -1,5 +1,3 @@
-# SQL Server for local development only. The password below is a throwaway local
-# placeholder - never commit a real credential.
 services:
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
@@ -22,6 +20,25 @@ services:
       timeout: 5s
       retries: 12
       start_period: 20s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: supportdesk-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__Default: "Server=sqlserver,1433;Database=SupportDesk;User Id=sa;Password=${MSSQL_SA_PASSWORD:-Local_Dev_Password1};TrustServerCertificate=True;Encrypt=False"
+      Jwt__SigningKey: "${JWT_SIGNING_KEY:-LocalOnly_ChangeThisSigningKey_32Bytes!}"
+      Jwt__Issuer: SupportDesk
+      Jwt__Audience: SupportDesk.Web
+      DevelopmentAuth__Password: "${DEVELOPMENT_AUTH_PASSWORD:-DevOnly_Password1!}"
+    ports:
+      - "5080:8080"
+    depends_on:
+      sqlserver:
+        condition: service_healthy
 
 volumes:
   supportdesk-sql:

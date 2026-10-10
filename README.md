@@ -62,6 +62,48 @@ npm run web                   # terminal 2: React dev server
 In Development the API applies migrations and seeds demo data on startup. **Never commit real
 credentials.**
 
+### Run with Docker Compose
+
+Prerequisites: Docker Desktop with Docker Compose.
+
+Start SQL Server and the API:
+
+```bash
+docker compose up --build -d
+```
+
+The first build may take several minutes. SQL Server must become healthy before the API starts. In the Development environment, the API applies EF Core migrations and seeds demo data on startup.
+
+- **API:** http://localhost:5080
+- **Swagger UI:** http://localhost:5080/swagger
+- **SQL Server:** localhost, port 1433
+
+The API endpoints require authentication. Sign in using the development demo account below, then send the returned token as `Authorization: Bearer <token>` when calling protected endpoints.
+
+**Development demo account**
+- Email: `alex.turner@northwind-support.example`
+- Password: `DevOnly_Password1!`
+
+These are local-development credentials only. The password can be overridden using `DEVELOPMENT_AUTH_PASSWORD` in `.env`. Do not use these defaults outside local development.
+
+Check container status and logs:
+
+```bash
+docker compose ps
+docker compose logs --tail=100 api
+```
+
+Stop the services while retaining database data:
+
+```bash
+docker compose down
+```
+
+To remove the SQL Server volume and its stored database data as well, use `docker compose down -v`. **This permanently deletes that local database data.**
+
+The credentials and signing key are for local development only. Replace them with unique secrets before sharing the environment; do not commit `.env` or production secrets.
+
+
 **Visual Studio 2026:** run `npm run db:up`, open `SupportDesk.sln`, set
 **SupportDesk.Presentation** as the startup project, and press F5 on the **https** profile.
 
@@ -113,3 +155,22 @@ and 40 tickets across every status, priority and SLA state.
 ## Ticket escalation history
 
 The `TicketEscalations` table has a composite index on `(TicketId, EscalatedAtUtc)`. The ticket ID supports retrieving history for a specific ticket, while the escalation timestamp supports ordering those records newest first without scanning unrelated tickets' history.
+
+## Design decisions
+
+- **Server-side filtering:** Chosen over fetching all tickets and filtering in the browser so pagination and total counts remain correct and unrelated records are not transferred to the client.
+- **Centralised triage and SLA rules:** Kept business rules in the backend and made SLA settings configurable instead of duplicating logic in the UI or hard-coding every threshold.
+- **Separate escalation history:** Stored escalation events in `TicketEscalations` rather than keeping only the latest escalation on the ticket, so earlier events remain auditable.
+- **JWT authentication:** Chosen for the protected API and React client. A separate session service and refresh-token flow were not introduced because they are outside the assignment scope.
+- **Server-derived escalation actor:** The API derives the actor from the authenticated identity instead of trusting an agent ID supplied by the client.
+- **Multi-stage Docker build:** Used separate SDK and runtime images to keep build tooling out of the final API image. Docker Compose waits for SQL Server health before starting the API.
+- **Development-only startup seeding:** Kept automatic migrations and demo-data seeding in Development. Production deployment should use a deliberate migration process and managed secrets.
+
+## Known limitations
+
+- Authentication does not include registration, password reset, refresh tokens, MFA, OAuth/SSO, or role-based authorization.
+- Docker Compose is intended for local development. Its default credentials and signing key must be replaced for any shared or production environment.
+- The API currently applies migrations and seeds demo data automatically in Development; production deployment needs a separate migration and secret-management strategy.
+- Authentication-specific automated regression coverage could be expanded; login and protected-endpoint behaviour was also verified manually.
+- The frontend lint command reports one non-blocking React Fast Refresh warning.
+- Production deployment automation and additional security hardening are outside the current scope.

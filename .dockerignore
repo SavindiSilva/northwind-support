@@ -1,0 +1,32 @@
+# Git
+.git
+.gitignore
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# .NET build output
+**/bin/
+**/obj/
+.vs/
+.vscode/
+
+# Frontend dependencies and generated output
+**/node_modules/
+**/dist/
+**/coverage/
+
+# Test results
+**/TestResults/
+
+# Local databases and logs
+*.db
+*.db-shm
+*.db-wal
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
