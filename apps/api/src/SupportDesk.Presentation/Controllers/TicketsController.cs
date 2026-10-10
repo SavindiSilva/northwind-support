@@ -6,6 +6,8 @@ using SupportDesk.Application.Features.Tickets.Commands.ChangeTicketStatus;
 using SupportDesk.Application.Features.Tickets.Commands.RaiseTicket;
 using SupportDesk.Application.Features.Tickets.Queries.GetTicket;
 using SupportDesk.Application.Features.Tickets.Queries.SearchTickets;
+using SupportDesk.Application.Features.Tickets.Commands.EscalateTicket;
+using SupportDesk.Application.Abstractions;
 
 namespace SupportDesk.Presentation.Controllers;
 
@@ -56,4 +58,28 @@ public sealed class TicketsController : ControllerBase
         [FromServices] AssignTicketCommandHandler handler,
         CancellationToken ct) =>
         handler.HandleAsync(id, request, ct);
+
+    /// <summary>Escalates a ticket and records the escalation history.</summary>
+    [HttpPost("{id:int}/escalate")]
+    public Task<EscalateTicketResultDto> Escalate(
+        int id,
+        EscalateTicketRequest request,
+        [FromServices] EscalateTicketCommandHandler handler,
+        CancellationToken ct) =>
+        handler.HandleAsync(id, request, ct);
+
+    /// <summary>Returns a ticket's escalation history, newest first.</summary>
+    [HttpGet("{id:int}/escalations")]
+    public async Task<ActionResult<IReadOnlyList<TicketEscalationDto>>> GetEscalations(
+        int id,
+        [FromServices] GetTicketQueryHandler getTicket,
+        [FromServices] ITicketQueries ticketQueries,
+        CancellationToken ct)
+    {
+        // Ensure a nonexistent ticket returns 404 rather than an empty history.
+        await getTicket.HandleAsync(id, ct);
+
+        var history = await ticketQueries.GetEscalationsAsync(id, ct);
+        return Ok(history);
+    }
 }

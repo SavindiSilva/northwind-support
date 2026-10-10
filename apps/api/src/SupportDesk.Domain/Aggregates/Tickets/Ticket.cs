@@ -111,4 +111,48 @@ public sealed class Ticket : AggregateRoot
         AssignedAgentId = agentId;
         UpdatedAtUtc = nowUtc;
     }
+
+    /// <summary>Applies the initial triage decisions to a newly raised ticket.</summary>
+    public void ApplyTriage(
+        TicketPriority priority,
+        int? agentId,
+        DateTime dueAtUtc,
+        DateTime nowUtc)
+    {
+        Priority = priority;
+        AssignedAgentId = agentId;
+        DueAtUtc = dueAtUtc;
+        UpdatedAtUtc = nowUtc;
+    }
+
+    /// <summary>Applies an escalation after the caller has validated the new assignment and SLA.</summary>
+    public void Escalate(
+        TicketPriority newPriority,
+        int? newAgentId,
+        DateTime newDueAtUtc,
+        DateTime nowUtc)
+    {
+        if (Priority == TicketPriority.Critical)
+        {
+            throw new BusinessRuleViolationException(
+                $"Ticket {Reference} is already Critical and cannot be escalated.");
+        }
+
+        if (Status is TicketStatus.Resolved or TicketStatus.Closed)
+        {
+            throw new BusinessRuleViolationException(
+                $"Ticket {Reference} is resolved or closed and cannot be escalated.");
+        }
+
+        if ((int)newPriority != (int)Priority + 1)
+        {
+            throw new BusinessRuleViolationException(
+                "Escalation must increase priority by exactly one level.");
+        }
+
+        Priority = newPriority;
+        AssignedAgentId = newAgentId;
+        DueAtUtc = newDueAtUtc;
+        UpdatedAtUtc = nowUtc;
+    }
 }

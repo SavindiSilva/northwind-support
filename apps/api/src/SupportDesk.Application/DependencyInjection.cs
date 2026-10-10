@@ -9,6 +9,8 @@ using SupportDesk.Application.Features.Tickets.Commands.ChangeTicketStatus;
 using SupportDesk.Application.Features.Tickets.Commands.RaiseTicket;
 using SupportDesk.Application.Features.Tickets.Queries.GetTicket;
 using SupportDesk.Application.Features.Tickets.Queries.SearchTickets;
+using SupportDesk.Application.Features.Tickets;
+using SupportDesk.Application.Features.Tickets.Commands.EscalateTicket;
 
 namespace SupportDesk.Application;
 
@@ -33,6 +35,10 @@ public static class DependencyInjection
         services.AddScoped<GetCategoriesQueryHandler>();
 
         services.AddValidatorsFromAssemblyContaining<RaiseTicketCommandHandler>(ServiceLifetime.Singleton);
+
+        services.AddScoped<TicketTriageService>();
+
+        services.AddScoped<EscalateTicketCommandHandler>();
 
         return services;
     }

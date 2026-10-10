@@ -33,6 +33,45 @@ export function CreateTicketPage() {
           <p>
             Raised <strong>{created.reference}</strong> for {created.customer.name}.
           </p>
+
+          <p>
+            <strong>Priority:</strong> {created.priority}
+          </p>
+          <p>
+            <strong>Assigned to:</strong>{' '}
+            {created.assignedAgent?.fullName ?? 'Unassigned'}
+          </p>
+          <p>
+            <strong>SLA deadline:</strong>{' '}
+            {created.dueAtUtc
+              ? new Date(created.dueAtUtc).toLocaleString()
+              : 'Not applicable'}
+          </p>
+
+          {created.triage && (
+            <>
+              <h3>Triage decisions</h3>
+              <ul>
+                <li>
+                  <strong>Priority decision:</strong>{' '}
+                  {created.triage.priorityReason}
+                </li>
+                <li>
+                  <strong>SLA window:</strong>{' '}
+                  {created.triage.slaWindowHours} hours
+                </li>
+                <li>
+                  <strong>SLA explanation:</strong>{' '}
+                  {created.triage.slaReason}
+                </li>
+                <li>
+                  <strong>Assignment decision:</strong>{' '}
+                  {created.triage.assignmentReason}
+                </li>
+              </ul>
+            </>
+          )}
+
           <div className="button-row">
             <button
               type="button"
@@ -41,7 +80,11 @@ export function CreateTicketPage() {
             >
               Open {created.reference}
             </button>
-            <button type="button" className="button button--ghost" onClick={() => setCreated(undefined)}>
+            <button
+              type="button"
+              className="button button--ghost"
+              onClick={() => setCreated(undefined)}
+            >
               Raise another
             </button>
           </div>

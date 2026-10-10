@@ -26,4 +26,34 @@ public class SlaEvaluatorTests
     [Fact]
     public void Evaluate_OpenAndBeforeDue_IsWithinSla() =>
         Assert.Equal(SlaStatus.WithinSla, SlaEvaluator.Evaluate(Now.AddHours(1), null, Now));
+
+    [Fact]
+    public void Evaluate_OpenExactlyAtDueTime_IsAtRisk()
+    {
+        var dueAt = Now.AddHours(4);
+
+        Assert.Equal(
+            SlaStatus.AtRisk,
+            SlaEvaluator.Evaluate(dueAt, null, dueAt, slaWindowHours: 4));
+    }
+
+    [Fact]
+    public void Evaluate_ExactlyAtAtRiskThreshold_IsAtRisk()
+    {
+        var dueAt = Now.AddHours(1);
+
+        Assert.Equal(
+            SlaStatus.AtRisk,
+            SlaEvaluator.Evaluate(dueAt, null, Now, slaWindowHours: 4));
+    }
+
+    [Fact]
+    public void Evaluate_JustOutsideAtRiskThreshold_IsWithinSla()
+    {
+        var dueAt = Now.AddHours(1).AddSeconds(1);
+
+        Assert.Equal(
+            SlaStatus.WithinSla,
+            SlaEvaluator.Evaluate(dueAt, null, Now, slaWindowHours: 4));
+    }
 }

@@ -7,6 +7,8 @@ using SupportDesk.Domain.Aggregates.Categories;
 using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
 using SupportDesk.Infrastructure.Data;
+using Microsoft.Extensions.Options;
+using SupportDesk.Application.Features.Tickets;
 
 namespace SupportDesk.Infrastructure.Queries;
 
@@ -14,8 +16,12 @@ namespace SupportDesk.Infrastructure.Queries;
 /// Ticket reads. Projected in the database and never tracked. Aggregates hold only each
 /// other's ids, so the customer, category and agent labels are joined in here, on the read side.
 /// </summary>
-public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQueries
+public sealed class TicketQueries(
+    SupportDbContext db,
+    IClock clock,
+    IOptions<SlaOptions> slaOptions) : ITicketQueries
 {
+    private readonly SlaOptions _sla = slaOptions.Value;
     /// <remarks>
     /// Applies the requested filters in the database before counting, sorting and paging
     /// the matching tickets.
@@ -59,6 +65,70 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
             tickets = tickets.Where(x => x.Ticket.AssignedAgentId == null);
         }
 
+        var now = clock.UtcNow;
+        if (query.SlaStatus is not null)
+        {
+            var slaFilterNow = now;
+            var lowHours = _sla.BaseWindowHours[nameof(TicketPriority.Low)];
+            var mediumHours = _sla.BaseWindowHours[nameof(TicketPriority.Medium)];
+            var highHours = _sla.BaseWindowHours[nameof(TicketPriority.High)];
+            var criticalHours = _sla.BaseWindowHours[nameof(TicketPriority.Critical)];
+            var premiumMultiplier = _sla.PremiumCustomerMultiplier;
+            var minimumHours = _sla.MinimumWindowHours;
+            var atRiskThreshold = _sla.AtRiskThresholdPercent / 100.0;
+
+            tickets = query.SlaStatus.Value switch
+            {
+                SlaStatus.NotApplicable =>
+                    tickets.Where(x => x.Ticket.DueAtUtc == null),
+
+                SlaStatus.Met =>
+                    tickets.Where(x =>
+                        x.Ticket.DueAtUtc != null &&
+                        x.Ticket.ResolvedAtUtc != null &&
+                        x.Ticket.ResolvedAtUtc <= x.Ticket.DueAtUtc),
+
+                SlaStatus.Breached =>
+                    tickets.Where(x =>
+                        x.Ticket.DueAtUtc != null &&
+                        (x.Ticket.ResolvedAtUtc > x.Ticket.DueAtUtc ||
+                        (x.Ticket.ResolvedAtUtc == null && x.Ticket.DueAtUtc < slaFilterNow))),
+
+                SlaStatus.AtRisk =>
+                    tickets.Where(x =>
+                        x.Ticket.DueAtUtc != null &&
+                        x.Ticket.ResolvedAtUtc == null &&
+                        x.Ticket.DueAtUtc >= slaFilterNow &&
+                        x.Ticket.DueAtUtc <= slaFilterNow.AddHours(
+                            Math.Max(
+                                minimumHours,
+                                (x.Ticket.Priority == TicketPriority.Low ? lowHours :
+                                x.Ticket.Priority == TicketPriority.Medium ? mediumHours :
+                                x.Ticket.Priority == TicketPriority.High ? highHours :
+                                criticalHours) *
+                                (x.Customer.Tier == CustomerTier.Premium ? premiumMultiplier : 1.0)
+                            ) * atRiskThreshold)),
+
+                SlaStatus.WithinSla =>
+                    tickets.Where(x =>
+                        x.Ticket.DueAtUtc != null &&
+                        x.Ticket.ResolvedAtUtc == null &&
+                        x.Ticket.DueAtUtc >= slaFilterNow &&
+                        x.Ticket.DueAtUtc > slaFilterNow.AddHours(
+                            Math.Max(
+                                minimumHours,
+                                (x.Ticket.Priority == TicketPriority.Low ? lowHours :
+                                x.Ticket.Priority == TicketPriority.Medium ? mediumHours :
+                                x.Ticket.Priority == TicketPriority.High ? highHours :
+                                criticalHours) *
+                                (x.Customer.Tier == CustomerTier.Premium ? premiumMultiplier : 1.0)
+                            ) * atRiskThreshold)),
+
+                _ => tickets
+            };
+        }
+
+
         // Ignore blank searches and trim spaces around the search text.
         var search = query.Search?.Trim();
 
@@ -72,8 +142,6 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
 
         // Count only matching tickets, before sorting and pagination.
         var totalCount = await tickets.CountAsync(ct);
-
-        var now = clock.UtcNow;
 
         var items = await ApplySort(tickets, query)
             .Skip((query.Page - 1) * query.PageSize)
@@ -97,7 +165,11 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
                 DueAtUtc = x.Ticket.DueAtUtc,
                 ResolvedAtUtc = x.Ticket.ResolvedAtUtc,
                 SlaStatus = SlaEvaluator.Evaluate(
-                    x.Ticket.DueAtUtc, x.Ticket.ResolvedAtUtc, now)
+                    x.Ticket.DueAtUtc,
+                    x.Ticket.ResolvedAtUtc,
+                    now,
+                    CalculateSlaWindowHours(x.Customer.Tier, x.Ticket.Priority, _sla),
+                    _sla.AtRiskThresholdPercent)
             })
             .ToListAsync(ct);
 
@@ -128,7 +200,12 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
                 UpdatedAtUtc = x.Ticket.UpdatedAtUtc,
                 DueAtUtc = x.Ticket.DueAtUtc,
                 ResolvedAtUtc = x.Ticket.ResolvedAtUtc,
-                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.ResolvedAtUtc, now)
+                SlaStatus = SlaEvaluator.Evaluate(
+                    x.Ticket.DueAtUtc,
+                    x.Ticket.ResolvedAtUtc,
+                    now,
+                    CalculateSlaWindowHours(x.Customer.Tier, x.Ticket.Priority, _sla),
+                    _sla.AtRiskThresholdPercent)
             })
             .FirstOrDefaultAsync(ct);
     }
@@ -155,10 +232,65 @@ public sealed class TicketQueries(SupportDbContext db, IClock clock) : ITicketQu
                 UpdatedAtUtc = x.Ticket.UpdatedAtUtc,
                 DueAtUtc = x.Ticket.DueAtUtc,
                 ResolvedAtUtc = x.Ticket.ResolvedAtUtc,
-                SlaStatus = SlaEvaluator.Evaluate(x.Ticket.DueAtUtc, x.Ticket.ResolvedAtUtc, now)
+                SlaStatus = SlaEvaluator.Evaluate(
+                    x.Ticket.DueAtUtc,
+                    x.Ticket.ResolvedAtUtc,
+                    now,
+                    CalculateSlaWindowHours(x.Customer.Tier, x.Ticket.Priority, _sla),
+                    _sla.AtRiskThresholdPercent)
             })
             .ToListAsync(ct);
     }
+
+    public async Task<IReadOnlyList<TicketEscalationDto>> GetEscalationsAsync(
+        int ticketId,
+        CancellationToken ct)
+    {
+        var query =
+            from escalation in db.Set<TicketEscalation>().AsNoTracking()
+            where escalation.TicketId == ticketId
+            join fromAgentRow in db.Set<Agent>()
+                on escalation.FromAgentId equals (int?)fromAgentRow.Id into fromAgents
+            from fromAgent in fromAgents.DefaultIfEmpty()
+            join toAgentRow in db.Set<Agent>()
+                on escalation.ToAgentId equals (int?)toAgentRow.Id into toAgents
+            from toAgent in toAgents.DefaultIfEmpty()
+            orderby escalation.EscalatedAtUtc descending, escalation.Id descending
+            select new TicketEscalationDto(
+                escalation.Id,
+                escalation.TicketId,
+                escalation.FromPriority,
+                escalation.ToPriority,
+                fromAgent == null
+                    ? null
+                    : new AgentSummaryDto(fromAgent.Id, fromAgent.FullName),
+                toAgent == null
+                    ? null
+                    : new AgentSummaryDto(toAgent.Id, toAgent.FullName),
+                escalation.FromDueAtUtc,
+                escalation.ToDueAtUtc,
+                escalation.Reason,
+                escalation.EscalatedBy,
+                escalation.EscalatedAtUtc);
+
+        return await query.ToListAsync(ct);
+    }
+    private static double CalculateSlaWindowHours(
+        CustomerTier tier,
+        TicketPriority priority,
+        SlaOptions settings)
+    {
+        if (!settings.BaseWindowHours.TryGetValue(priority.ToString(), out var baseHours))
+            throw new InvalidOperationException(
+                $"No SLA window is configured for priority '{priority}'.");
+
+        var multiplier = tier == CustomerTier.Premium
+            ? settings.PremiumCustomerMultiplier
+            : 1.0;
+
+        return Math.Max(settings.MinimumWindowHours, baseHours * multiplier);
+    }
+
 
     /// <summary>
     /// Every ticket with the rows that label it. Filter and sort this, then project.

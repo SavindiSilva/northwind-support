@@ -35,4 +35,10 @@ public sealed class TicketDetailDto
 
     /// <summary>Derived from the dates above; never stored.</summary>
     public SlaStatus SlaStatus { get; set; }
+
+    /// <summary>Explains the automated decisions made when the ticket was triaged.</summary>
+    public List<string> TriageReasons { get; set; } = [];
+
+    /// <summary>Structured explanation of the automated triage decisions.</summary>
+    public TicketTriageDto? Triage { get; set; }
 }

@@ -87,9 +87,11 @@ Both pass on a clean checkout and neither needs a database.
 
 | Endpoint | Description |
 | --- | --- |
-| `GET /api/tickets` | Paged list with `search`, `status`, `priority`, `categoryId`, `customerId`, `assignedAgentId`, `unassignedOnly`, `sortBy`, `sortDirection`. **Filters are accepted but not applied yet** (Task 1). |
+| `GET /api/tickets` | Paged list with server-side `search`, `status`, `priority`, `categoryId`, `customerId`, `assignedAgentId`, `unassignedOnly`, `slaStatus`, `sortBy`, and `sortDirection` filters. |
 | `GET /api/tickets/{id}` | One ticket |
 | `POST /api/tickets` | Create a ticket |
+| `POST /api/tickets/{id}/escalate` | Escalate a ticket by one priority level and record the escalation history. |
+| `GET /api/tickets/{id}/escalations` | Retrieve a ticket's escalation history, newest first. |
 | `PATCH /api/tickets/{id}/status` · `/assignment` | Change status / assignee |
 | `GET /api/customers` · `/api/agents` · `/api/categories` | Reference data |
 
@@ -107,3 +109,7 @@ and 40 tickets across every status, priority and SLA state.
 | Browser warns about the certificate | `dotnet dev-certs https --trust`, or use the web app, which proxies |
 | Web app shows "Unable to load tickets" | The API is not running, or `VITE_API_PROXY_TARGET` points at the wrong port |
 | SQL Server slow on Apple Silicon | Enable Rosetta in Docker Desktop → Settings → General |
+
+## Ticket escalation history
+
+The `TicketEscalations` table has a composite index on `(TicketId, EscalatedAtUtc)`. The ticket ID supports retrieving history for a specific ticket, while the escalation timestamp supports ordering those records newest first without scanning unrelated tickets' history.

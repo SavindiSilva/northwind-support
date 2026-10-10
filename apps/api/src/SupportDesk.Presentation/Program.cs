@@ -4,6 +4,7 @@ using SupportDesk.Infrastructure;
 using SupportDesk.Presentation.Extensions;
 using SupportDesk.Presentation.Filters;
 using SupportDesk.Presentation.Middleware;
+using SupportDesk.Application.Features.Tickets;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,6 +29,8 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddApplication();
+builder.Services.Configure<SlaOptions>(
+    builder.Configuration.GetSection(SlaOptions.SectionName));
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();

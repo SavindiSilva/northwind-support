@@ -1,7 +1,8 @@
-
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using SupportDesk.Application.Contracts.Tickets;
+using SupportDesk.Application.Features.Tickets;
 using SupportDesk.Domain.Aggregates.Categories;
 using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
@@ -37,6 +38,64 @@ public sealed class TicketQueriesTests
         Assert.Single(result.Items);
         Assert.Equal("TCK-HIGH", result.Items[0].Reference);
         Assert.Equal(1, result.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetPagedAsync_FiltersBySlaStatusBeforeCounting()
+    {
+        await using var fixture = await CreateFixtureAsync();
+
+        var now = FixedClock.DefaultNow;
+
+        fixture.Db.AddRange(
+            new TicketBuilder()
+                .WithReference("TCK-WITHIN")
+                .WithPriority(TicketPriority.Medium)
+                .Build(),
+            new TicketBuilder()
+                .WithReference("TCK-BREACHED")
+                .WithPriority(TicketPriority.Medium)
+                .Build());
+
+        await fixture.Db.SaveChangesAsync();
+
+        var tickets = await fixture.Db.Set<Ticket>()
+            .ToListAsync();
+
+        var withinTicket = tickets.Single(
+            x => x.Reference == "TCK-WITHIN");
+
+        var breachedTicket = tickets.Single(
+            x => x.Reference == "TCK-BREACHED");
+
+        withinTicket.ApplyTriage(
+            TicketPriority.Medium,
+            null,
+            now.AddHours(25),
+            now);
+
+        breachedTicket.ApplyTriage(
+            TicketPriority.Medium,
+            null,
+            now.AddHours(-1),
+            now);
+
+        await fixture.Db.SaveChangesAsync();
+
+        var result = await fixture.Queries.GetPagedAsync(
+            new TicketQuery
+            {
+                SlaStatus = SlaStatus.Breached,
+                Page = 1,
+                PageSize = 1
+            },
+            CancellationToken.None);
+
+        Assert.Single(result.Items);
+        Assert.Equal("TCK-BREACHED", result.Items[0].Reference);
+        Assert.Equal(SlaStatus.Breached, result.Items[0].SlaStatus);
+        Assert.Equal(1, result.TotalCount);
+        Assert.Equal(1, result.TotalPages);
     }
 
     [Fact]
@@ -124,7 +183,11 @@ public sealed class TicketQueriesTests
             await db.SaveChangesAsync();
 
             var clock = new FixedClock();
-            var queries = new TicketQueries(db, clock);
+
+            var queries = new TicketQueries(
+                db,
+                clock,
+                Options.Create(new SlaOptions()));
 
             return new TestFixture(connection, db, queries);
         }
