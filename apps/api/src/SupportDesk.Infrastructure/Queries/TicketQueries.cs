@@ -100,14 +100,26 @@ public sealed class TicketQueries(
                         x.Ticket.ResolvedAtUtc == null &&
                         x.Ticket.DueAtUtc >= slaFilterNow &&
                         x.Ticket.DueAtUtc <= slaFilterNow.AddHours(
-                            Math.Max(
-                                minimumHours,
-                                (x.Ticket.Priority == TicketPriority.Low ? lowHours :
-                                x.Ticket.Priority == TicketPriority.Medium ? mediumHours :
-                                x.Ticket.Priority == TicketPriority.High ? highHours :
-                                criticalHours) *
+                            (
+                                (
+                                    x.Ticket.Priority == TicketPriority.Low ? lowHours :
+                                    x.Ticket.Priority == TicketPriority.Medium ? mediumHours :
+                                    x.Ticket.Priority == TicketPriority.High ? highHours :
+                                    criticalHours
+                                ) *
                                 (x.Customer.Tier == CustomerTier.Premium ? premiumMultiplier : 1.0)
-                            ) * atRiskThreshold)),
+                            ) < minimumHours
+                                ? minimumHours
+                                : (
+                                    (
+                                        x.Ticket.Priority == TicketPriority.Low ? lowHours :
+                                        x.Ticket.Priority == TicketPriority.Medium ? mediumHours :
+                                        x.Ticket.Priority == TicketPriority.High ? highHours :
+                                        criticalHours
+                                    ) *
+                                    (x.Customer.Tier == CustomerTier.Premium ? premiumMultiplier : 1.0)
+                                
+                        ) * atRiskThreshold)),
 
                 SlaStatus.WithinSla =>
                     tickets.Where(x =>
@@ -115,14 +127,26 @@ public sealed class TicketQueries(
                         x.Ticket.ResolvedAtUtc == null &&
                         x.Ticket.DueAtUtc >= slaFilterNow &&
                         x.Ticket.DueAtUtc > slaFilterNow.AddHours(
-                            Math.Max(
-                                minimumHours,
-                                (x.Ticket.Priority == TicketPriority.Low ? lowHours :
-                                x.Ticket.Priority == TicketPriority.Medium ? mediumHours :
-                                x.Ticket.Priority == TicketPriority.High ? highHours :
-                                criticalHours) *
+                            (
+                                (
+                                    x.Ticket.Priority == TicketPriority.Low ? lowHours :
+                                    x.Ticket.Priority == TicketPriority.Medium ? mediumHours :
+                                    x.Ticket.Priority == TicketPriority.High ? highHours :
+                                    criticalHours
+                                ) *
                                 (x.Customer.Tier == CustomerTier.Premium ? premiumMultiplier : 1.0)
-                            ) * atRiskThreshold)),
+                            ) < minimumHours
+                                ? minimumHours
+                                : (
+                                    (
+                                        x.Ticket.Priority == TicketPriority.Low ? lowHours :
+                                        x.Ticket.Priority == TicketPriority.Medium ? mediumHours :
+                                        x.Ticket.Priority == TicketPriority.High ? highHours :
+                                        criticalHours
+                                    ) *
+                                    (x.Customer.Tier == CustomerTier.Premium ? premiumMultiplier : 1.0)
+                                
+                        ) * atRiskThreshold)),
 
                 _ => tickets
             };
