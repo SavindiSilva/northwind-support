@@ -8,6 +8,8 @@ using SupportDesk.Application.Features.Tickets.Queries.GetTicket;
 using SupportDesk.Application.Features.Tickets.Queries.SearchTickets;
 using SupportDesk.Application.Features.Tickets.Commands.EscalateTicket;
 using SupportDesk.Application.Abstractions;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
 
 namespace SupportDesk.Presentation.Controllers;
 
@@ -59,14 +61,25 @@ public sealed class TicketsController : ControllerBase
         CancellationToken ct) =>
         handler.HandleAsync(id, request, ct);
 
-    /// <summary>Escalates a ticket and records the escalation history.</summary>
+    /// <summary>Escalates a ticket and records the authenticated agent.</summary>
+    [Authorize]
     [HttpPost("{id:int}/escalate")]
-    public Task<EscalateTicketResultDto> Escalate(
+    public async Task<ActionResult<EscalateTicketResultDto>> Escalate(
         int id,
         EscalateTicketRequest request,
         [FromServices] EscalateTicketCommandHandler handler,
-        CancellationToken ct) =>
-        handler.HandleAsync(id, request, ct);
+        CancellationToken ct)
+    {
+        var escalatedBy = User.FindFirstValue(ClaimTypes.Name);
+
+        if (string.IsNullOrWhiteSpace(escalatedBy))
+        {
+            return Unauthorized();
+        }
+
+        var result = await handler.HandleAsync(id, request, escalatedBy, ct);
+        return Ok(result);
+    }
 
     /// <summary>Returns a ticket's escalation history, newest first.</summary>
     [HttpGet("{id:int}/escalations")]

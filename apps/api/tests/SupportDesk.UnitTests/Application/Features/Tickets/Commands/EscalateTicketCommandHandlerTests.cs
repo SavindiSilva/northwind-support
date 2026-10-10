@@ -91,7 +91,8 @@ public sealed class EscalateTicketCommandHandlerTests
 
         var result = await handler.HandleAsync(
             41,
-            new EscalateTicketRequest("Customer impact increased", "Test user"),
+            new EscalateTicketRequest("Customer impact increased"),
+            "Test user",
             CancellationToken.None);
 
         Assert.Equal(TicketPriority.High, ticket.Priority);
@@ -121,7 +122,8 @@ public sealed class EscalateTicketCommandHandlerTests
         await Assert.ThrowsAsync<ValidationException>(() =>
             handler.HandleAsync(
                 41,
-                new EscalateTicketRequest(reason, escalatedBy),
+                new EscalateTicketRequest(reason),
+                escalatedBy,
                 CancellationToken.None));
 
         context.UnitOfWork.Verify(
@@ -138,7 +140,8 @@ public sealed class EscalateTicketCommandHandlerTests
         await Assert.ThrowsAsync<NotFoundException>(() =>
             handler.HandleAsync(
                 999,
-                new EscalateTicketRequest("Customer impact increased", "Test user"),
+                new EscalateTicketRequest("Customer impact increased"),
+                "Test user",
                 CancellationToken.None));
 
         context.UnitOfWork.Verify(
@@ -164,7 +167,8 @@ public sealed class EscalateTicketCommandHandlerTests
         await Assert.ThrowsAsync<ConflictException>(() =>
             handler.HandleAsync(
                 41,
-                new EscalateTicketRequest("Customer impact increased", "Test user"),
+                new EscalateTicketRequest("Customer impact increased"),
+                "Test user",
                 CancellationToken.None));
 
         context.UnitOfWork.Verify(
@@ -270,7 +274,8 @@ public sealed class EscalateTicketCommandHandlerTests
 
         await handler.HandleAsync(
             41,
-            new EscalateTicketRequest("Customer impact increased", "Test user"),
+            new EscalateTicketRequest("Customer impact increased"),
+            "Test user",
             CancellationToken.None);
 
         Assert.Equal(1, ticket.AssignedAgentId);
@@ -341,7 +346,8 @@ public sealed class EscalateTicketCommandHandlerTests
 
         await handler.HandleAsync(
             41,
-            new EscalateTicketRequest("Customer impact increased", "Test user"),
+            new EscalateTicketRequest("Customer impact increased"),
+            "Test user",
             CancellationToken.None);
 
         Assert.Equal(2, ticket.AssignedAgentId);

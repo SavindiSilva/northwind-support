@@ -19,12 +19,13 @@ public sealed class EscalateTicketCommandHandler(
     public async Task<EscalateTicketResultDto> HandleAsync(
         int id,
         EscalateTicketRequest request,
+        string escalatedBy,
         CancellationToken ct)
     {
         var errors = new Dictionary<string, string[]>();
 
         var reason = request.Reason?.Trim() ?? string.Empty;
-        var escalatedBy = request.EscalatedBy?.Trim() ?? string.Empty;
+        escalatedBy = escalatedBy?.Trim() ?? string.Empty;
 
         if (reason.Length < 5 || reason.Length > 500)
         {
@@ -34,8 +35,8 @@ public sealed class EscalateTicketCommandHandler(
 
         if (escalatedBy.Length is < 1 or > 100)
         {
-            errors[nameof(request.EscalatedBy)] =
-                ["EscalatedBy is required and must not exceed 100 characters."];
+            errors["EscalatedBy"] =
+                ["Authenticated agent name is required and must not exceed 100 characters."];
         }
 
         if (errors.Count > 0)

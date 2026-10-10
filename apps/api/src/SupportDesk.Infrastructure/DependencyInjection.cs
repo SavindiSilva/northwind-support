@@ -7,6 +7,8 @@ using SupportDesk.Infrastructure.Data;
 using SupportDesk.Infrastructure.Queries;
 using SupportDesk.Infrastructure.Repositories;
 using SupportDesk.Infrastructure.Services;
+using Microsoft.AspNetCore.Identity;
+using SupportDesk.Domain.Aggregates.Agents;
 
 namespace SupportDesk.Infrastructure;
 
@@ -41,6 +43,7 @@ public static class DependencyInjection
         services.AddScoped<IAgentQueries, AgentQueries>();
         services.AddScoped<ICategoryQueries, CategoryQueries>();
 
+        services.AddScoped<IPasswordHasher<Agent>, PasswordHasher<Agent>>();
         services.AddScoped<SupportDbSeeder>();
 
         services.AddScoped<ITicketEscalationRepository, TicketEscalationRepository>();

@@ -5,6 +5,8 @@ using SupportDesk.Domain.Aggregates.Agents;
 using SupportDesk.Domain.Aggregates.Categories;
 using SupportDesk.Domain.Aggregates.Customers;
 using SupportDesk.Domain.Aggregates.Tickets;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.Extensions.Configuration;
 
 namespace SupportDesk.Infrastructure.Data;
 
@@ -17,11 +19,35 @@ namespace SupportDesk.Infrastructure.Data;
 /// Every aggregate is built through its own behaviour. The two historical values no behaviour
 /// produces - a ticket's last update and its due date - are set through EF Core directly.
 /// </remarks>
-public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<SupportDbSeeder> logger)
+public sealed class SupportDbSeeder(SupportDbContext db,IClock clock,ILogger<SupportDbSeeder> logger,IPasswordHasher<Agent> passwordHasher,IConfiguration configuration)
 {
     /// <summary>Seeds the database, unless it already has tickets in it.</summary>
     public async Task SeedAsync(CancellationToken ct = default)
     {
+        var developmentPassword = configuration["DevelopmentAuth:Password"];
+
+        if (string.IsNullOrWhiteSpace(developmentPassword))
+        {
+            throw new InvalidOperationException(
+                "DevelopmentAuth:Password must be configured for development seeding.");
+        }
+
+        var existingAgents = await db.Set<Agent>().ToListAsync(ct);
+
+        var agentsNeedingPasswords = existingAgents
+            .Where(a => string.IsNullOrEmpty(a.PasswordHash))
+            .ToList();
+
+        foreach (var agent in agentsNeedingPasswords)
+        {
+            agent.SetPasswordHash(
+                passwordHasher.HashPassword(agent, developmentPassword));
+        }
+
+        if (agentsNeedingPasswords.Count > 0)
+        {
+            await db.SaveChangesAsync(ct);
+        }
         if (await db.Set<Ticket>().AnyAsync(ct))
         {
             logger.LogInformation("Seed data already present; skipping.");
@@ -33,6 +59,11 @@ public sealed class SupportDbSeeder(SupportDbContext db, IClock clock, ILogger<S
         var categories = SeedCategories();
         var customers = SeedCustomers(now);
         var agents = SeedAgents(now);
+        foreach (var agent in agents)
+        {
+            agent.SetPasswordHash(
+                passwordHasher.HashPassword(agent, developmentPassword));
+        }
 
         db.AddRange(categories);
         db.AddRange(customers);

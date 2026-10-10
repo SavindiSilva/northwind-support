@@ -1,4 +1,5 @@
 import type { ProblemDetails } from '../types/api';
+import { clearSession, getToken } from './auth';
 
 /**
  * Where the API lives. In development this stays '/api' and the Vite dev server proxies it
@@ -19,24 +20,37 @@ export class ApiError extends Error {
     this.problem = problem;
   }
 
-  /** Field name to messages, when the failure was a validation failure. */
+  /** Field name to messages, when the failure is a validation failure. */
   get fieldErrors(): Record<string, string[]> {
     return this.problem?.errors ?? {};
   }
 }
 
 /**
- * The single place that talks to the API. Returns parsed JSON, or throws an
- * {@link ApiError} that callers can show to the user.
+ * The single place that talks to the API. Attaches the current token and
+ * clears the local session if the server rejects it as unauthenticated.
  */
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
+  const headers = new Headers(init?.headers);
+
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const response = await fetch(`${baseUrl}${path}`, {
     ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(init?.headers ?? {}),
-    },
+    headers,
   });
+
+  if (response.status === 401 && path !== '/auth/login') {
+    clearSession();
+    window.dispatchEvent(new Event('auth:unauthorized'));
+  }
 
   if (!response.ok) {
     const problem = await readProblem(response);
@@ -72,7 +86,6 @@ async function readProblem(response: Response): Promise<ProblemDetails | undefin
   try {
     return (await response.json()) as ProblemDetails;
   } catch {
-    // Not every failure has a JSON body - a dead server certainly will not.
     return undefined;
   }
 }
