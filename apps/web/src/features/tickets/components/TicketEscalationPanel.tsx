@@ -14,29 +14,56 @@ export function TicketEscalationPanel({
   onUpdated,
 }: TicketEscalationPanelProps) {
   const [reason, setReason] = useState('');
-  const [escalatedBy, setEscalatedBy] = useState('');
   const [history, setHistory] = useState<TicketEscalation[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string>();
   const [historyError, setHistoryError] = useState<string>();
 
-  const loadHistory = useCallback(async () => {
-    setLoadingHistory(true);
-    setHistoryError(undefined);
+  const loadHistory = useCallback(async (showLoading = true) => {
+    if (showLoading) {
+      setLoadingHistory(true);
+      setHistoryError(undefined);
+    }
 
     try {
-      setHistory(await ticketsApi.getEscalations(ticket.id));
+      const result = await ticketsApi.getEscalations(ticket.id);
+      setHistory(result);
     } catch (caught) {
-      setHistoryError(toErrorMessage(caught, 'Could not load escalation history.'));
+      setHistoryError(
+        toErrorMessage(caught, 'Could not load escalation history.'),
+      );
     } finally {
       setLoadingHistory(false);
     }
   }, [ticket.id]);
 
   useEffect(() => {
-    void loadHistory();
-  }, [loadHistory]);
+    let cancelled = false;
+
+    ticketsApi.getEscalations(ticket.id)
+      .then((result) => {
+        if (!cancelled) {
+          setHistory(result);
+        }
+      })
+      .catch((caught: unknown) => {
+        if (!cancelled) {
+          setHistoryError(
+            toErrorMessage(caught, 'Could not load escalation history.'),
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingHistory(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [ticket.id]);
 
   const terminal =
     ticket.priority === 'Critical' ||
@@ -47,15 +74,9 @@ export function TicketEscalationPanel({
     event.preventDefault();
 
     const trimmedReason = reason.trim();
-    const trimmedActor = escalatedBy.trim();
 
     if (trimmedReason.length < 5 || trimmedReason.length > 500) {
       setError('The reason must contain between 5 and 500 characters.');
-      return;
-    }
-
-    if (!trimmedActor) {
-      setError('Enter who is requesting the escalation.');
       return;
     }
 
@@ -65,7 +86,6 @@ export function TicketEscalationPanel({
     try {
       const result = await ticketsApi.escalateTicket(ticket.id, {
         reason: trimmedReason,
-        escalatedBy: trimmedActor,
       });
 
       onUpdated(result.ticket);
@@ -108,22 +128,10 @@ export function TicketEscalationPanel({
             </small>
           </div>
 
-          <div className="field">
-            <label htmlFor="escalated-by">Requested by</label>
-            <input
-              id="escalated-by"
-              value={escalatedBy}
-              onChange={(event) => setEscalatedBy(event.target.value)}
-              maxLength={100}
-              required
-              disabled={pending}
-            />
-          </div>
-
           <button
             type="submit"
             className="button button--primary"
-            disabled={pending || !reason.trim() || !escalatedBy.trim()}
+            disabled={pending || !reason.trim()}
           >
             {pending ? 'Escalating...' : 'Escalate ticket'}
           </button>

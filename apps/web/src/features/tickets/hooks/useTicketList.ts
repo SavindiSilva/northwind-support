@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ApiError } from '../../../api/client';
 import { ticketsApi } from '../../../api/tickets';
 import type {
@@ -36,7 +36,7 @@ export function useTicketList() {
   const [state, setState] = useState<State>({ isLoading: true });
   const [debouncedSearch, setDebouncedSearch] = useState(filters.search);
 
-  const load = async (queryFilters: TicketFilters = filters) => {
+  const load = useCallback(async (queryFilters: TicketFilters) => {
     setState((current) => ({
       ...current,
       isLoading: true,
@@ -58,7 +58,7 @@ export function useTicketList() {
         error: message,
       }));
     }
-  };
+  }, []);
 
   // Debounce search so typing doesn't trigger a request for every character.
   useEffect(() => {
@@ -69,12 +69,26 @@ export function useTicketList() {
     return () => window.clearTimeout(handle);
   }, [filters.search]);
 
-  // Apply other filters immediately, using the debounced search value.
+  // Apply filters whenever a relevant filter or the debounced search changes.
   useEffect(() => {
-    void load({ ...filters, search: debouncedSearch });
+    const queryFilters: TicketFilters = {
+      search: debouncedSearch,
+      status: filters.status,
+      priority: filters.priority,
+      categoryId: filters.categoryId,
+      customerId: filters.customerId,
+      assignedAgentId: filters.assignedAgentId,
+      unassignedOnly: filters.unassignedOnly,
+      slaStatus: filters.slaStatus,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      sortBy: filters.sortBy,
+      sortDirection: filters.sortDirection,
+    };
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void Promise.resolve().then(() => load(queryFilters));
   }, [
+    load,
     debouncedSearch,
     filters.status,
     filters.priority,
@@ -100,11 +114,27 @@ export function useTicketList() {
     setFilters(emptyFilters);
   };
 
+  const reload = () =>
+    load({
+      search: debouncedSearch,
+      status: filters.status,
+      priority: filters.priority,
+      categoryId: filters.categoryId,
+      customerId: filters.customerId,
+      assignedAgentId: filters.assignedAgentId,
+      unassignedOnly: filters.unassignedOnly,
+      slaStatus: filters.slaStatus,
+      page: filters.page,
+      pageSize: filters.pageSize,
+      sortBy: filters.sortBy,
+      sortDirection: filters.sortDirection,
+    });
+
   return {
     filters,
     updateFilters,
     resetFilters,
-    reload: load,
+    reload,
     ...state,
   };
 }

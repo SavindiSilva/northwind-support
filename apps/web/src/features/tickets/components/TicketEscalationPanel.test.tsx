@@ -59,9 +59,7 @@ describe('TicketEscalationPanel', () => {
   it('validates the escalation reason before submitting', async () => {
     render(<TicketEscalationPanel ticket={ticket} onUpdated={vi.fn()} />);
 
-    fireEvent.change(screen.getByLabelText('Requested by'), {
-      target: { value: 'Test User' },
-    });
+
     fireEvent.change(screen.getByLabelText('Reason'), {
       target: { value: 'Bad' },
     });
@@ -88,9 +86,7 @@ describe('TicketEscalationPanel', () => {
 
     render(<TicketEscalationPanel ticket={ticket} onUpdated={onUpdated} />);
 
-    fireEvent.change(screen.getByLabelText('Requested by'), {
-      target: { value: 'Test User' },
-    });
+
     fireEvent.change(screen.getByLabelText('Reason'), {
       target: { value: 'Customer impact is increasing.' },
     });
@@ -99,7 +95,6 @@ describe('TicketEscalationPanel', () => {
     await waitFor(() => {
       expect(ticketsApi.escalateTicket).toHaveBeenCalledWith(12, {
         reason: 'Customer impact is increasing.',
-        escalatedBy: 'Test User',
       });
     });
 
@@ -115,9 +110,7 @@ describe('TicketEscalationPanel', () => {
     const onUpdated = vi.fn();
     render(<TicketEscalationPanel ticket={ticket} onUpdated={onUpdated} />);
 
-    fireEvent.change(screen.getByLabelText('Requested by'), {
-      target: { value: 'Test User' },
-    });
+
     fireEvent.change(screen.getByLabelText('Reason'), {
       target: { value: 'Customer impact is increasing.' },
     });
