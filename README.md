@@ -115,6 +115,19 @@ npm test                      # dotnet test, then the web tests (Vitest)
 
 Both pass on a clean checkout and neither needs a database.
 
+### Docker verification
+
+The following checks were performed during development:
+
+- **Clean database startup:** `docker compose down -v` followed by `docker compose up --build -d` to verify that migrations and demo-data seeding work with a fresh database volume.
+- **Health check:** Verified that `http://localhost:5080/health` reports healthy database connectivity.
+- **Seed data:** Confirmed that demo tickets are available after startup. Protected ticket endpoints require a valid bearer token.
+- **Restore caching:** Temporarily changed a C# source file and rebuilt the image. The `dotnet restore` layer remained cached.
+- **Image size:** The runtime image was approximately 455 MB, compared with approximately 1.3 GB for the .NET SDK image.
+- **Non-root execution:** Verified that the API container runs as the `app` user rather than root.
+- **Web development proxy:** Run `VITE_API_PROXY_TARGET=http://localhost:5080 npm run web` to start the web app against the Compose API. In PowerShell, use `$env:VITE_API_PROXY_TARGET = "http://localhost:5080"` before running `npm run web`.
+- **Production migrations:** Production deployments should apply reviewed migrations through a deliberate deployment or release step, rather than relying on automatic application startup migrations. Production secrets should be supplied through managed configuration or a secrets manager.
+
 ## Commands
 
 | Command | What it does |
@@ -172,9 +185,22 @@ The ticket-filter request flow did not correctly trigger a fresh API request whe
 - **Development-only startup seeding:** Kept automatic migrations and demo-data seeding in Development. Production deployment should use a deliberate migration process and managed secrets.
 - **Credential and token security:** Agent passwords are hashed with ASP.NET Core's `IPasswordHasher<T>`. Successful login issues a signed JWT; protected API endpoints require a valid bearer token, and the escalation actor is derived from the authenticated identity. The signing key is supplied through configuration and validated at startup rather than embedded in application code.
 
+### Authentication and security details
+
+- **Token lifetime:** Access tokens expire after **one hour**. The client handles expired or invalid authentication by clearing the stored session and redirecting to login.
+- **Token storage:** The frontend stores the JWT in `localStorage`. This keeps the implementation simple for the assignment, but JavaScript running through an XSS vulnerability could access the token. A production design should evaluate stronger session-storage protections and additional security controls.
+- **Agent credentials:** Authentication credentials are stored with the `Agent` record because an agent is the identity that signs in and performs support-desk actions. Passwords are hashed using ASP.NET Core's `IPasswordHasher<Agent>`; plaintext passwords are not stored. The inactive-agent check prevents inactive accounts from signing in.
+- **Escalation history index:** The composite index on `(TicketId, EscalatedAtUtc)` supports retrieving a ticket's escalation events in timestamp order without scanning unrelated tickets' history.
+
 ## AI usage
 
-I used ChatGPT as a development aid to investigate defects, discuss implementation options, review code and tests, and improve documentation. I ran the automated test suites and manually verified important authentication, filtering, escalation, and Docker behaviours. I reviewed the submitted changes and remain responsible for understanding and explaining the implementation.
+I used ChatGPT as a development aid throughout the assignment to investigate defects, compare implementation approaches, review code and tests, troubleshoot build and runtime issues, and improve documentation. I used it to support my decisions rather than treating generated code as automatically correct.
+
+- **Workflow that worked:** I described the requirement or failure, reviewed the proposed approach, implemented or adapted the changes, and ran the relevant automated tests. I also manually checked important behaviours, including authentication, ticket filtering, escalation, and Docker startup.
+- **Example accepted with minor changes:** [Describe one specific suggestion you accepted, what it did, and any changes you made before using it.]
+- **Example changed or rejected:** [Describe a specific suggestion that you changed or rejected, and explain why the original approach did not suit the requirements or existing architecture.]
+- **AI-related bug or issue:** [Describe a real issue introduced or identified while using AI assistance, how you detected it, and how you corrected it. If you did not encounter one, state that honestly rather than inventing an example.]
+- **Verification:** I ran the .NET and frontend test suites, checked the production frontend build, and manually tested key application flows. I reviewed the resulting changes and used test results and runtime behaviour to verify the implementation rather than relying solely on AI-generated explanations.
 
 ## Known limitations
 
