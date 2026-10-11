@@ -188,7 +188,7 @@ The ticket-filter request flow did not correctly trigger a fresh API request whe
 ### Authentication and security details
 
 - **Token lifetime:** Access tokens expire after **one hour**. The client handles expired or invalid authentication by clearing the stored session and redirecting to login.
-- **Token storage:** The frontend stores the JWT in `localStorage`. This keeps the implementation simple for the assignment, but JavaScript running through an XSS vulnerability could access the token. A production design should evaluate stronger session-storage protections and additional security controls.
+- **Token storage:** The frontend stores JWTs in `localStorage` for this assignment. An XSS vulnerability could expose a stored token to injected JavaScript. A production implementation should evaluate secure, HttpOnly cookies with appropriate SameSite settings and CSRF protections, alongside broader security hardening.
 - **Agent credentials:** Authentication credentials are stored with the `Agent` record because an agent is the identity that signs in and performs support-desk actions. Passwords are hashed using ASP.NET Core's `IPasswordHasher<Agent>`; plaintext passwords are not stored. The inactive-agent check prevents inactive accounts from signing in.
 - **Escalation history index:** The composite index on `(TicketId, EscalatedAtUtc)` supports retrieving a ticket's escalation events in timestamp order without scanning unrelated tickets' history.
 
@@ -197,9 +197,9 @@ The ticket-filter request flow did not correctly trigger a fresh API request whe
 I used ChatGPT as a development aid throughout the assignment to investigate defects, compare implementation approaches, review code and tests, troubleshoot build and runtime issues, and improve documentation. I used it to support my decisions rather than treating generated code as automatically correct.
 
 - **Workflow that worked:** I described the requirement or failure, reviewed the proposed approach, implemented or adapted the changes, and ran the relevant automated tests. I also manually checked important behaviours, including authentication, ticket filtering, escalation, and Docker startup.
-- **Example accepted with minor changes:** [Describe one specific suggestion you accepted, what it did, and any changes you made before using it.]
-- **Example changed or rejected:** [Describe a specific suggestion that you changed or rejected, and explain why the original approach did not suit the requirements or existing architecture.]
-- **AI-related bug or issue:** [Describe a real issue introduced or identified while using AI assistance, how you detected it, and how you corrected it. If you did not encounter one, state that honestly rather than inventing an example.]
+- **Example accepted with minor changes:** I used ChatGPT's help to structure regression tests for the ticket-filtering defect. I focused the test on observable behaviour—changing a filter should trigger a new API request—and adapted it to the existing hook and testing setup.
+- **How I evaluated suggestions:** I checked proposed approaches against the existing architecture and assignment requirements before implementing them. For example, I verified that ticket filtering was applied on the server before counting and pagination, so the returned results and totals remained consistent across pages. I cannot identify a specific AI-generated suggestion that I rejected outright, so I have not attributed this design decision to one.
+- **AI-related bug or issue:** I did not identify a specific bug that I could confidently attribute to AI-generated code. I treated generated suggestions as unverified and checked the implementation through automated tests, build results, and manual verification.
 - **Verification:** I ran the .NET and frontend test suites, checked the production frontend build, and manually tested key application flows. I reviewed the resulting changes and used test results and runtime behaviour to verify the implementation rather than relying solely on AI-generated explanations.
 
 ## Known limitations
