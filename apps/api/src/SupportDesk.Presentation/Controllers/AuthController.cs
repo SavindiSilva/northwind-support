@@ -91,11 +91,11 @@ public sealed class AuthController(
 }
 
 public sealed record LoginRequest(
-    [property: Required]
-    [property: EmailAddress]
+    [param: Required]
+    [param: EmailAddress]
     string Email,
 
-    [property: Required]
+    [param: Required]
     string Password);
 
 public sealed record LoginResponse(

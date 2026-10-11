@@ -24,7 +24,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: apps/api/Dockerfile
     container_name: supportdesk-api
     environment:
       ASPNETCORE_ENVIRONMENT: Development

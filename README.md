@@ -156,6 +156,10 @@ and 40 tickets across every status, priority and SLA state.
 
 The `TicketEscalations` table has a composite index on `(TicketId, EscalatedAtUtc)`. The ticket ID supports retrieving history for a specific ticket, while the escalation timestamp supports ordering those records newest first without scanning unrelated tickets' history.
 
+## DEFECT-117: Root cause and fix
+
+The ticket-filter request flow did not correctly trigger a fresh API request when filter state changed, which could leave the ticket list displaying stale results. I corrected the request-triggering logic and added a regression test to verify that changing filters triggers the expected request. Filtering, counting, and pagination are handled server-side so the result count and displayed page remain consistent with the selected filters.
+
 ## Design decisions
 
 - **Server-side filtering:** Chosen over fetching all tickets and filtering in the browser so pagination and total counts remain correct and unrelated records are not transferred to the client.
@@ -164,7 +168,13 @@ The `TicketEscalations` table has a composite index on `(TicketId, EscalatedAtUt
 - **JWT authentication:** Chosen for the protected API and React client. A separate session service and refresh-token flow were not introduced because they are outside the assignment scope.
 - **Server-derived escalation actor:** The API derives the actor from the authenticated identity instead of trusting an agent ID supplied by the client.
 - **Multi-stage Docker build:** Used separate SDK and runtime images to keep build tooling out of the final API image. Docker Compose waits for SQL Server health before starting the API.
+- **Image size and clean-start verification:** The built `northwind-support-api:latest` image was approximately **455 MB** on the development machine. I tested startup with a fresh SQL Server volume and verified that migrations and demo-data seeding completed successfully. The API ran as the non-root `app` user, and `/health` reported database connectivity.
 - **Development-only startup seeding:** Kept automatic migrations and demo-data seeding in Development. Production deployment should use a deliberate migration process and managed secrets.
+- **Credential and token security:** Agent passwords are hashed with ASP.NET Core's `IPasswordHasher<T>`. Successful login issues a signed JWT; protected API endpoints require a valid bearer token, and the escalation actor is derived from the authenticated identity. The signing key is supplied through configuration and validated at startup rather than embedded in application code.
+
+## AI usage
+
+I used ChatGPT as a development aid to investigate defects, discuss implementation options, review code and tests, and improve documentation. I ran the automated test suites and manually verified important authentication, filtering, escalation, and Docker behaviours. I reviewed the submitted changes and remain responsible for understanding and explaining the implementation.
 
 ## Known limitations
 

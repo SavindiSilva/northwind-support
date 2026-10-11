@@ -9,6 +9,7 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.IdentityModel.Tokens;
+using SupportDesk.Infrastructure.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -75,6 +76,35 @@ builder.Services.Configure<SlaOptions>(
 builder.Services.AddInfrastructure(builder.Configuration);
 
 var app = builder.Build();
+
+app.MapGet("/health", async (
+    SupportDbContext db,
+    CancellationToken cancellationToken) =>
+{
+    try
+    {
+        if (await db.Database.CanConnectAsync(cancellationToken))
+        {
+            return Results.Ok(new
+            {
+                status = "Healthy",
+                database = "Connected"
+            });
+        }
+    }
+    catch (Exception)
+    {
+        // Do not expose database connection details in the health response.
+    }
+
+    return Results.Json(
+        new
+        {
+            status = "Unhealthy",
+            database = "Unavailable"
+        },
+        statusCode: StatusCodes.Status503ServiceUnavailable);
+}).AllowAnonymous();
 
 app.UseMiddleware<ExceptionHandlingMiddleware>();
 
