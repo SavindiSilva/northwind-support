@@ -168,7 +168,7 @@ The ticket-filter request flow did not correctly trigger a fresh API request whe
 - **JWT authentication:** Chosen for the protected API and React client. A separate session service and refresh-token flow were not introduced because they are outside the assignment scope.
 - **Server-derived escalation actor:** The API derives the actor from the authenticated identity instead of trusting an agent ID supplied by the client.
 - **Multi-stage Docker build:** Used separate SDK and runtime images to keep build tooling out of the final API image. Docker Compose waits for SQL Server health before starting the API.
-- **Image size and clean-start verification:** The built `northwind-support-api:latest` image was approximately **455 MB** on the development machine. I tested startup with a fresh SQL Server volume and verified that migrations and demo-data seeding completed successfully. The API ran as the non-root `app` user, and `/health` reported database connectivity.
+- **Image size and clean-start verification:** The built `northwind-support-api:latest` runtime image was approximately **455 MB**, compared with **1.3 GB** for `mcr.microsoft.com/dotnet/sdk:10.0`. I tested startup with a fresh SQL Server volume and verified that migrations and demo-data seeding completed successfully. The API ran as the non-root `app` user, and `/health` reported database connectivity. I also changed a `.cs` source file temporarily and rebuilt the image; the `dotnet restore` layer remained cached while the source copy and publish layers reran.
 - **Development-only startup seeding:** Kept automatic migrations and demo-data seeding in Development. Production deployment should use a deliberate migration process and managed secrets.
 - **Credential and token security:** Agent passwords are hashed with ASP.NET Core's `IPasswordHasher<T>`. Successful login issues a signed JWT; protected API endpoints require a valid bearer token, and the escalation actor is derived from the authenticated identity. The signing key is supplied through configuration and validated at startup rather than embedded in application code.
 
@@ -181,6 +181,20 @@ I used ChatGPT as a development aid to investigate defects, discuss implementati
 - Authentication does not include registration, password reset, refresh tokens, MFA, OAuth/SSO, or role-based authorization.
 - Docker Compose is intended for local development. Its default credentials and signing key must be replaced for any shared or production environment.
 - The API currently applies migrations and seeds demo data automatically in Development; production deployment needs a separate migration and secret-management strategy.
-- Authentication-specific automated regression coverage could be expanded; login and protected-endpoint behaviour was also verified manually.
+- Automated authentication controller tests cover successful login, incorrect passwords, unknown email addresses, inactive agents, and missing credentials. The JWT-protected API flow was also verified manually.
+- The frontend stores JWTs in localStorage for this assignment. This is convenient, but injected JavaScript could access a stored token if an XSS vulnerability exists; production use needs further security hardening.
 - The frontend lint command reports one non-blocking React Fast Refresh warning.
 - Production deployment automation and additional security hardening are outside the current scope.
+
+## Time spent
+
+These are my approximate hours, including implementation, debugging, testing, and related work.
+
+| Activity | Approximate time |
+| --- | ---: |
+| Understanding the assignment and setting up prerequisites | 2 hours |
+| Task 1 — Defect fix and server-side filtering | 2–2.5 hours |
+| Task 2 — Ticket triage, SLA tracking, assignment, and escalation | 10–12 hours |
+| Task 3 — Authentication and login UI | 4–5 hours |
+| Task 4 — Docker setup and verification | 2 hours |
+| **Total** | **20–23.5 hours** |

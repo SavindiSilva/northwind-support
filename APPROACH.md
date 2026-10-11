@@ -78,7 +78,7 @@ The signing key and development password are configuration values, not credentia
 
 ### Verification
 
-Manually verified that a valid demo login returns a token, the token grants access to protected endpoints, unauthenticated requests return `401 Unauthorized`, and an inactive agent cannot log in. Frontend tests and the production build also passed.
+Automated controller tests cover successful login, incorrect passwords, unknown email addresses, inactive agents, and missing credentials. Manually verified that a valid demo login returns a token, the token grants access to protected endpoints, unauthenticated requests return `401 Unauthorized`, and an inactive agent cannot log in. The frontend authentication tests and production build also passed.
 
 ## Task 4 — Dockerise the API
 
@@ -94,6 +94,16 @@ I excluded local environment files, build output, dependencies, and other unnece
 
 Successfully built the API image, started both containers, confirmed SQL Server was healthy, logged in through the containerised API, and retrieved category data using the returned bearer token.
 
+- Confirmed the API runs as the non-root app user.
+
+- Confirmed /health reports database connectivity without authentication.
+
+- Verified migrations and demo-data seeding after removing the database volume.
+
+- Compared the approximately 455 MB runtime image with the 1.3 GB SDK image.
+
+- Temporarily changed a C# source file and rebuilt the image; the dotnet restore layer remained cached while the source-copy and publish layers reran.
+
 ## Cross-cutting decisions
 
 - **Preserve the existing architecture:** extend the existing domain, application, infrastructure, and presentation layers rather than bypassing them.
@@ -104,17 +114,13 @@ Successfully built the API image, started both containers, confirmed SQL Server 
 
 ## Testing evidence
 
-The following checks passed during development:
+The following checks passed during the final verification run:
 
-- Backend solution tests: 61 tests passed.
-- Frontend tests: 15 tests passed.
+- Backend solution tests: 69 passed, 0 failed.
+- Frontend tests: 15 passed, 0 failed.
 - Frontend production build: passed.
-- Frontend lint: no errors; one non-blocking React Fast Refresh warning remained.
-- Docker API image build: passed.
-- Docker Compose startup: API started and SQL Server became healthy.
-- Manual authentication and protected-endpoint checks: passed.
-
-Authentication was verified manually; the above test totals should not be interpreted as 61 dedicated authentication tests.
+- Lint: 0 errors and 1 non-blocking React Fast Refresh warning.
+- Docker image build, Compose startup, authentication, and protected-endpoint checks: passed.
 
 ## Known limitations
 
