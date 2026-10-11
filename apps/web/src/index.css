@@ -458,28 +458,49 @@ textarea[aria-invalid='true'] {
   margin: 48px auto;
 }
 
+.page:has(#login-heading) .card {
+  background: #f0f7ff;
+  border: 1px solid #d4e6fa;
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 8px 24px rgba(41, 85, 135, 0.08);
+}
+
 .page:has(#login-heading) .card h1 {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .page:has(#login-heading) .card > p {
   color: var(--colour-muted);
-  margin: 0 0 20px;
+  margin: 0 0 16px;
 }
 
 .page:has(#login-heading) .form {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
 }
 
 .page:has(#login-heading) .field {
   min-width: 0;
-  margin-bottom: 8px;
+  flex: 0 0 auto;
+  margin: 0 0 10px;
+  gap: 2px;
 }
 
 .page:has(#login-heading) .button {
   align-self: flex-start;
+  margin-top: 0;
+}
+
+@media (max-width: 640px) {
+  .page:has(#login-heading) {
+    margin: 24px auto;
+  }
+
+  .page:has(#login-heading) .card {
+    padding: 22px;
+  }
 }
 
 @media (max-width: 640px) {
